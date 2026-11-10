@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# NUPACK is licensed and must not be committed
+nupack-*/
+
+# Training / evaluation corpora (distributed separately, see README)
+data/
+
+# Caches written by the analysis scripts
+results/*/_score_cache/
+results/*/mutagenesis_nupack/
+results/encoder_retrained/
+
+# Benchmark inputs rebuilt from accession lists, and run artifacts
+benchmark/targets/*/*.fasta
+benchmark/targets/*/*.fna
+benchmark/output/*/*/
+benchmark/output/logs/
+benchmark/output/deg_abnormality/calibration_scores.npz
+
+# Generated figures
+figures/
+
+# Design outputs from the examples
+example/out/

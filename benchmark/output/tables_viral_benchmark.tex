@@ -1,0 +1,137 @@
+\begin{table}[htbp]
+\centering
+\caption{\textbf{Abnormality rates of primers designed by each tool.} Percentage of each scheme's primers flagged by the Olivia encoder heads. Continued in Table~\ref{tab:viral_benchmark_evaluation_cont}; see its note for column definitions.}
+\label{tab:viral_benchmark_evaluation}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{llYYYYY}
+\toprule
+& & \multicolumn{5}{c}{\textbf{Abnormality Rate (\%) $\downarrow$}} \\
+\textbf{Viral Dataset} & \textbf{Tool} & \textbf{Head A} & \textbf{Head C (Marg.)} & \textbf{Head C (Inter.)} & \textbf{Head P} & \textbf{Overall} \\
+\midrule
+% --- SARS-CoV-2 ---
+\multirow{5}{*}{\textbf{SARS-CoV-2}}
+& Olivia-NUPACK & 1.85 & 8.89 & 1.48 & \textbf{0.74} & \textbf{10.74} \\
+& Olivia-deg & \textbf{1.22} & 10.98 & \textbf{0.41} & 1.63 & \underline{12.20} \\
+& Olivar & 8.62 & 28.45 & 8.62 & 9.91 & 40.52 \\
+& PrimalScheme3 & 5.06 & 37.34 & 6.96 & 1.27 & 44.94 \\
+& varVAMP & 1.49 & \textbf{0.50} & 18.32 & 0.99 & 19.80 \\
+\midrule
+
+% --- RSV-B ---
+\multirow{5}{*}{\textbf{RSV-B}}
+& Olivia-NUPACK & 2.50 & 19.17 & 4.17 & 0.83 & \underline{20.83} \\
+& Olivia-deg & \textbf{0.00} & 25.81 & \textbf{1.61} & \textbf{0.00} & 25.81 \\
+& Olivar & 7.50 & 38.33 & 12.50 & 2.50 & 46.67 \\
+& PrimalScheme3 & 5.43 & 52.17 & 5.43 & 1.09 & 55.43 \\
+& varVAMP & 1.79 & \textbf{0.00} & 10.71 & \textbf{0.00} & \textbf{12.50} \\
+\midrule
+
+% --- RSV-A ---
+\multirow{5}{*}{\textbf{RSV-A}}
+& Olivia-NUPACK & \textbf{0.00} & 19.67 & \textbf{5.74} & 0.82 & \textbf{23.77} \\
+& Olivia-deg & 1.69 & 30.51 & 11.86 & 0.85 & 34.75 \\
+& Olivar & 3.23 & 39.52 & 7.26 & 5.65 & 47.58 \\
+& PrimalScheme3 & 2.65 & 53.10 & 6.19 & \textbf{0.00} & 55.75 \\
+& varVAMP & 1.79 & \textbf{0.00} & 23.21 & 1.79 & \underline{25.00} \\
+\midrule
+
+% --- Measles ---
+\multirow{5}{*}{\textbf{Measles}}
+& Olivia-NUPACK & \textbf{0.00} & 6.45 & \textbf{1.61} & 0.81 & \textbf{6.45} \\
+& Olivia-deg & \textbf{0.00} & 3.08 & 5.38 & \textbf{0.00} & \underline{8.46} \\
+& Olivar & 7.14 & 15.08 & 7.94 & 9.52 & 26.19 \\
+& PrimalScheme3 & 2.21 & 16.91 & 9.56 & 0.74 & 27.21 \\
+& varVAMP & \textbf{0.00} & \textbf{0.00} & 19.23 & 0.96 & 19.23 \\
+\midrule
+
+% --- BoDV-1 ---
+\multirow{5}{*}{\textbf{BoDV-1}}
+& Olivia-NUPACK & 1.43 & 4.29 & \textbf{0.00} & \textbf{0.00} & \textbf{5.71} \\
+& Olivia-deg & 1.43 & 5.71 & 25.71 & \textbf{0.00} & 30.00 \\
+& Olivar & 7.35 & 14.71 & 5.88 & 4.41 & 23.53 \\
+& PrimalScheme3 & \textbf{0.88} & 7.89 & 4.39 & \textbf{0.00} & \underline{13.16} \\
+& varVAMP & 3.45 & \textbf{0.00} & 48.28 & 3.45 & 48.28 \\
+\midrule
+
+% --- HAV ---
+\multirow{5}{*}{\textbf{Hepatitis A}}
+& Olivia-NUPACK & 1.67 & 6.67 & \textbf{0.00} & \textbf{0.00} & \textbf{8.33} \\
+& Olivia-deg & \textbf{0.00} & 12.07 & 10.34 & \textbf{0.00} & \underline{20.69} \\
+& Olivar & 1.67 & 21.67 & 3.33 & 3.33 & 28.33 \\
+& PrimalScheme3 & \textbf{0.00} & 35.63 & 4.60 & 1.15 & 41.38 \\
+& varVAMP & \textbf{0.00} & \textbf{0.00} & 43.75 & \textbf{0.00} & 43.75 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{\textbf{Abnormality rates of primers designed by each tool (continued).} Percentage of each scheme's primers flagged by the Olivia encoder heads.}
+\label{tab:viral_benchmark_evaluation_cont}
+\vspace{6pt}
+\begin{tabularx}{\textwidth}{llYYYYY}
+\toprule
+& & \multicolumn{5}{c}{\textbf{Abnormality Rate (\%) $\downarrow$}} \\
+\textbf{Viral Dataset} & \textbf{Tool} & \textbf{Head A} & \textbf{Head C (Marg.)} & \textbf{Head C (Inter.)} & \textbf{Head P} & \textbf{Overall} \\
+\midrule
+% --- Rabies ---
+\multirow{5}{*}{\textbf{Rabies}}
+& Olivia-NUPACK & 1.06 & 3.19 & \textbf{1.06} & 1.06 & \textbf{5.32} \\
+& Olivia-deg & \textbf{0.00} & 5.56 & 12.22 & \textbf{0.00} & \underline{17.78} \\
+& Olivar & 3.19 & 12.77 & 3.19 & 4.26 & 20.21 \\
+& PrimalScheme3 & 2.33 & 16.28 & 6.40 & 1.74 & 23.84 \\
+& varVAMP & 1.28 & \textbf{0.00} & 30.77 & 1.28 & 32.05 \\
+\midrule
+
+% --- Polio ---
+\multirow{5}{*}{\textbf{Poliovirus 1}}
+& Olivia-NUPACK & \textbf{1.72} & 1.72 & \textbf{3.45} & \textbf{0.00} & \textbf{5.17} \\
+& Olivia-deg & 6.90 & 5.17 & 20.69 & 1.72 & 25.86 \\
+& Olivar & 6.90 & 13.79 & 5.17 & 6.90 & \underline{20.69} \\
+& PrimalScheme3 & 2.11 & 26.32 & 6.32 & 3.16 & 29.47 \\
+& varVAMP & 2.00 & \textbf{0.00} & 32.00 & 4.00 & 36.00 \\
+\midrule
+
+% --- HIV-1 ---
+\multirow{5}{*}{\textbf{HIV-1}}
+& Olivia-NUPACK & \textbf{0.00} & 15.71 & \textbf{0.00} & \textbf{0.00} & \underline{15.71} \\
+& Olivia-deg & 2.86 & 17.14 & 28.57 & 1.43 & 42.86 \\
+& Olivar & 2.94 & 29.41 & 7.35 & 2.94 & 35.29 \\
+& PrimalScheme3 & 4.67 & 18.69 & 1.87 & 1.87 & 23.36 \\
+& varVAMP & \textbf{0.00} & \textbf{0.00} & 4.55 & \textbf{0.00} & \textbf{4.55} \\
+\midrule
+
+% --- HEV ---
+\multirow{5}{*}{\textbf{Hepatitis E}}
+& Olivia-NUPACK & 1.85 & 9.26 & 5.56 & 5.56 & \textbf{12.96} \\
+& Olivia-deg & 3.70 & 18.52 & 29.63 & 1.85 & 48.15 \\
+& Olivar & 12.50 & 14.29 & 10.71 & 8.93 & 33.93 \\
+& PrimalScheme3 & \textbf{1.63} & 13.59 & \textbf{4.35} & \textbf{0.54} & \underline{18.48} \\
+& varVAMP & 4.35 & \textbf{2.17} & 32.61 & 2.17 & 36.96 \\
+\midrule
+
+% --- rat HEV ---
+\multirow{5}{*}{\textbf{Rat Hepatitis E}}
+& Olivia-NUPACK & 2.00 & 16.00 & \textbf{0.00} & \textbf{0.00} & \underline{18.00} \\
+& Olivia-deg & \textbf{0.00} & 12.00 & 30.00 & \textbf{0.00} & 42.00 \\
+& Olivar & 12.00 & 18.00 & 18.00 & 12.00 & 48.00 \\
+& PrimalScheme3 & 5.77 & 24.36 & 6.41 & 0.64 & 33.33 \\
+& varVAMP & \textbf{0.00} & \textbf{2.27} & 11.36 & \textbf{0.00} & \textbf{13.64} \\
+\midrule
+
+% --- HCV ---
+\multirow{5}{*}{\textbf{Hepatitis C}}
+& Olivia-NUPACK & 1.43 & 5.71 & \textbf{1.43} & 1.43 & \textbf{5.71} \\
+& Olivia-deg & 5.71 & 20.00 & 44.29 & 2.86 & 60.00 \\
+& Olivar & 10.00 & 14.29 & 4.29 & 11.43 & 24.29 \\
+& PrimalScheme3 & \textbf{0.66} & 14.57 & 8.61 & \textbf{0.66} & \underline{22.52} \\
+& varVAMP & 6.25 & \textbf{1.56} & 50.00 & 9.38 & 51.56 \\
+\bottomrule
+\end{tabularx}
+
+\vspace{6pt}
+\begin{minipage}{\linewidth}
+\scriptsize
+\textit{Note:} Lower values ($\downarrow$) indicate lower abnormality rates comparing with validated primer design. Head A, Head C, and Head P correspond to thermodynamic free energy of self-structure, property(marginal/interrelated), and primer pairmap respectively. Overall is the percentage of primers flagged by at least one head. Bold numbers highlight the best value per metric per viral dataset; underlined numbers mark the second-best Overall rate. Targets are ordered by mean per-column alignment entropy, most conserved first.
+\end{minipage}
+\end{table}

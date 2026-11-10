@@ -1,0 +1,369 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+
+'''
+Functions for primer design
+Architecture:
+design.py
+    primer_generator(object)
+        WAlignScore()
+    PrimerSetBadnessFast()
+'''
+
+
+__author__ = 'Michael X. Wang'
+
+
+import os
+CURRENT_DIR = os.path.dirname(__file__)
+
+
+import random
+import json
+from collections import Counter
+
+import numpy as np
+import pandas as pd
+from Bio import SeqIO
+
+import basic
+from basic import seq2num
+from basic import num2seq
+from basic import revcomp
+
+import logging
+logger = logging.getLogger('main')
+
+from msa_tools import average_scores, expand_degenerate_sequence
+
+
+GC_LETTER = ['C', 'G', 'c', 'g']
+
+
+def WAlignScore(seq1, seq2=None):
+    '''
+    Calculate primer self badness
+    '''
+    PENALTY_OFFSET = -0.75 # Formulat is (PO + 1) / (PO + d+1)
+    # if =1, then d=1 gives 2/3 socre, if =0, then d=1 gives 1/2 score, if =-0.5, then d=1 gives 1/3 score
+    indel_penalty = 3
+    replace_penalty = 2
+    GC_score = 2
+    AT_score = 1
+    
+    seq1 = seq1.lower()
+    len1 = len(seq1)
+    
+    if seq2 is not None:
+        seq2 = seq2.lower()
+        len2 = len(seq2)
+    else:
+        seq2 = basic.revcomp(seq1)
+        len2 = len1
+        
+    if len1 == 0:
+        max_score = 0
+    else:
+        score = np.zeros([len1, len2])
+        if seq1[0] == seq2[0]:
+            if seq1[0] == 'c' or seq1[0] == 'g':
+                score[0][0] = GC_score
+            else:
+                score[0][0] = AT_score
+                
+        for j in range(1, len2):
+            if seq1[0] == seq2[j]:
+                if seq1[0] == 'c' or seq1[0] == 'g':
+                    score[0][j] = GC_score
+                else:
+                    score[0][j] = AT_score
+            else:
+                score[0][j] = max(score[0][j-1] - indel_penalty, 0)
+                
+        for i in range(1, len1):
+            if seq1[i] == seq2[0]:
+                if seq1[i] == 'c' or seq1[i] == 'g':
+                    score[i][0] = GC_score
+                else:
+                    score[i][0] = AT_score
+            else:
+                score[i][0] = max(score[i-1][0] - indel_penalty, 0)
+                
+            for j in range(1, len2):
+                if seq1[i] == seq2[j]:
+                    if seq1[i] == 'c' or seq1[i] == 'g':
+                        score[i][j] = GC_score + score[i-1][j-1]
+                    else:
+                        score[i][j] = AT_score + score[i-1][j-1]
+                else:
+                    score[i][j] = max([score[i-1][j] - indel_penalty, 
+                                       score[i][j-1] - indel_penalty, 
+                                       score[i-1][j-1] - replace_penalty, 0])
+                    
+        # weight by offset
+        for i in range(len1):
+            for j in range(len2):
+                distance = len1 - i - 1
+                if seq1[i] == seq2[j]:
+                    score[i][j] -= 3*distance
+                else:
+                    score[i][j] = 0
+                    
+        max_score = 1.5**(score.max() - 6)
+    return max_score
+
+
+class primer_generator(object):
+    '''Primer candidate generator: g = primer_generator(temperature, salinity); g.get(seq,
+    ...).
+    '''
+    def __init__(self, temperature=60, salinity=0.18, end_pool_path=None):
+        paraH = np.array([[-7.6, -7.2, -8.4, -7.8],
+                          [-7.2, -7.6, -8.2, -8.5],
+                          [-8.5, -7.8, -8.0, -10.6],
+                          [-8.2, -8.4, -9.8, -8.0]])
+        paraS = np.array([[-21.3, -20.4, -22.4, -21.0],
+                          [-21.3, -21.3, -22.2, -22.7],
+                          [-22.7, -21.0, -19.9, -27.2],
+                          [-22.2, -22.4, -24.4, -19.9]])
+        self.paraS = paraS + 0.368 * np.log(salinity)
+        self.paraG = paraH - (temperature + 273.15) * self.paraS / 1000
+        self.dG_init = 0.2 - (temperature + 273.15) * (-5.7)/1000
+
+        # load pre-generated pool of primer end sequences
+        if not end_pool_path is None:
+            with open(end_pool_path) as f:
+                end_pool = json.load(f)
+            self.check_end = True
+            self.l_end = len(end_pool[0])
+            self.end_pool = [s.lower() for s in end_pool]
+        else:
+            self.check_end = False
+            self.l_end = None
+            self.end_pool = None
+        
+    def StacksDG(self, seq):
+        rep = basic.seq2arr(seq)
+        dG_stacks = 0
+        for i, _ in enumerate(rep[:-1]):
+            dG_stacks += self.paraG[rep[i]][rep[i+1]]
+        return dG_stacks
+    
+    def get(self, seq, prefix='', dG_max=-11.8, min_GC=0.2, max_GC=0.75, 
+            min_complexity=0.4, min_len=15, max_len=36, check_SNP=True, check_BLAST=False):
+        '''Generate primer candidates from a sequence; returns (DataFrame of primers,
+        failure counts).
+        '''
+        INTR_SCORE = 2
+
+        # input should be lowercase
+        if seq == seq.upper(): # all uppercase
+            # logger.info('input sequence should be in lowercase, with SNPs in uppercase. ')
+            seq = seq.lower()
+            if check_SNP:
+                # logger.info('ignore check_SNP')
+                check_SNP = False
+
+        primer_seq = [] # primer sequence
+        primer_arr = [] # array format
+        primer_len = [] # primer length without prefix
+        primer_dist = [] # distance to mother sequence end
+        badness = []
+        primer_dG = []
+        BLAST_hits = []
+        end_fail = 0 # number of primers failed end check
+        SNP_fail = 0 # number of primers failed SNP check
+        GC_fail = 0 # number of primers failed GC ratio check
+        complexity_fail = 0 # number of primers failed complexity check
+        for end_pos in range(len(seq)-1, 8, -1): # end_pos is 0-based
+            # check end
+            if self.check_end:
+                if not seq[end_pos-self.l_end+1:end_pos+1] in self.end_pool:
+                    end_fail += 1
+                    continue
+            # check SNP in last 5 bases
+            if check_SNP:
+                if seq[end_pos-4:end_pos+1] != seq[end_pos-4:end_pos+1].lower():
+                    SNP_fail += 1
+                    continue
+            start_pos = end_pos - 1
+            curr_dG = self.dG_init + average_scores(expand_degenerate_sequence(seq[start_pos:end_pos+1]), self.StacksDG)[0] 
+            # satisfy minimum length
+            while (start_pos > end_pos - min_len + 1) and (start_pos > 0):
+                start_pos -= 1
+                curr_dG += average_scores(expand_degenerate_sequence(seq[start_pos:(start_pos+2)]), self.StacksDG)[0] 
+            # long enough to satisfy energy but not exceeding max_len
+            while (curr_dG > dG_max) and (start_pos > end_pos - max_len + 1) and (start_pos > 0):
+                start_pos -= 1
+                curr_dG += average_scores(expand_degenerate_sequence(seq[start_pos:(start_pos+2)]), self.StacksDG)[0]    
+            # check restrictions
+            if (curr_dG <= dG_max) or (end_pos - start_pos + 1 == max_len):
+                GC_ratio = average_scores([seq[start_pos:end_pos+1]],basic.get_GC)[0]
+                if min_GC <= GC_ratio <= max_GC:
+                    complexity = average_scores([seq[start_pos:end_pos+1]], basic.get_complexity)[0]
+                    if complexity >= min_complexity:
+                        s_raw = seq[start_pos:end_pos+1]
+                        s = prefix + s_raw
+
+                        s_expand = expand_degenerate_sequence(s)
+                        primer_seq.append(s_expand)
+                        primer_arr.append([basic.seq2arr(s) for s in s_expand])
+
+                        primer_len.append(end_pos - start_pos + 1)
+                        primer_dist.append(len(seq) - end_pos - 1)
+                        primer_dG.append(curr_dG)
+
+                        if check_BLAST:
+                            #count = BLAST_seq(s_raw, **BLAST_config)
+                            if count > 0:
+                                #b = INTR_SCORE * WAlignScore(s) + 1000 * np.log10(count)**4
+                                b = INTR_SCORE * average_scores(s_expand, WAlignScore)[0] + 1000 * np.log10(count)**4
+                            else:
+                                #b = INTR_SCORE * WAlignScore(s)
+                                b = INTR_SCORE * average_scores(s_expand, WAlignScore)[0]
+                        else:
+                            count = -1
+                            #b = INTR_SCORE * WAlignScore(s)
+                            b = INTR_SCORE * average_scores(s_expand, WAlignScore)[0]
+                        BLAST_hits.append(count)
+                        badness.append(b)
+                    else:
+                        complexity_fail += 1
+                else:
+                    GC_fail += 1
+        primers = pd.DataFrame({'seq': primer_seq, 
+                                'arr': primer_arr, 
+                                'primer_len': primer_len, 
+                                'dist': primer_dist,    # distance from the primer to the end of seq
+                                'badness': badness, 
+                                'dG': primer_dG, 
+                                'BLAST_hits': BLAST_hits})
+
+        return primers, {'end_fail': end_fail, 'SNP_fail': SNP_fail, 
+        'GC_fail': GC_fail, 'complexity_fail': complexity_fail}
+
+
+def PrimerSetBadnessFast(all_fP: list, all_rP=[], existing=[], fP_conc=None, rP_conc=None):
+    '''SADDLE loss of a primer set: (total badness, badness per primer).'''
+    endhash4 = Counter()
+    endhash5 = Counter()
+    endhash6 = Counter()
+    middlehash7 = Counter()
+    middlehash8 = Counter()
+
+    PENALTY_OFFSET = 0 # if=1, then d=1 gives 2/3 socre, if =0, then d=1 gives 1/2 score, if =-0.5, then d=1 gives 1/3 score
+
+    END4 = 1
+    END5 = 4
+    END6 = 20
+    MIDDLE7 = 100
+    MIDDLE8 = 500
+
+    # NOTE: Intramolecular checks done at GeneratePrimerCandidates to be efficient
+
+    def flatten(lst):
+        flat_list = []
+        for item in lst:
+            if isinstance(item, list):
+                flat_list.extend(flatten(item))  # Recursively flatten nested lists
+            else:
+                flat_list.append(item)
+        return flat_list
+    
+    all_fP = flatten(all_fP) if all_fP else []
+    all_rP = flatten(all_rP) if all_rP else []
+    existing = flatten(existing) if existing else []
+
+    # Handle concentrations (default to 1.0 if not provided)
+    if fP_conc is None:
+        fP_conc = [1.0] * len(all_fP)
+    else:
+        fP_conc = flatten(fP_conc)
+        if len(fP_conc) != len(all_fP):
+            fP_conc = [1.0] * len(all_fP)
+    
+    if rP_conc is None:
+        rP_conc = [1.0] * len(all_rP)
+    else:
+        rP_conc = flatten(rP_conc)
+        if len(rP_conc) != len(all_rP):
+            rP_conc = [1.0] * len(all_rP)
+    
+    all_fP = [str(p.lower()) for p in all_fP]
+    all_rP = [str(p.lower()) for p in all_rP]
+    existing = [str(p.lower()) for p in existing]
+
+    # Set up end hash tables (check end 4 nt to middle binding)
+    for p, conc in zip(all_fP + all_rP + existing, 
+                       fP_conc + rP_conc + [1.0]*len(existing)):
+        endhash4[p[-4:]] += conc
+        endhash5[p[-5:]] += conc
+        endhash6[p[-6:]] += conc
+        
+    # Middle hash table; badness = 2 / (distance to 3' end + 2).
+    for p, conc in zip(all_fP + all_rP + existing,
+                      fP_conc + rP_conc + [1.0]*len(existing)):
+        l = len(p)
+        for j in range(l-6):
+            middlehash7[p[j:j+7]] += conc * (PENALTY_OFFSET + 1) / (l - j - 6 + PENALTY_OFFSET)
+        for j in range(l-7):
+            middlehash8[p[j:j+8]] += conc * (PENALTY_OFFSET + 1) / (l - j - 7 + PENALTY_OFFSET)
+
+    # Run through each sequence's reverse complement to add up badness
+    Badness = 0
+    Badness_component = []
+    # for one_side_primer in [all_fP, all_rP]:
+    for one_side_primer, one_side_conc in zip([all_fP, all_rP], [fP_conc, rP_conc]):
+        one_side_badness = []
+        # for p in one_side_primer:
+        for p, conc in zip(one_side_primer, one_side_conc):
+            p_badness = 0
+            c = basic.revcomp(p)
+            l = len(c)
+            for j in range(l-3):
+                k = c[j:j+4]
+                try:
+                    endscore4 = endhash4[k]
+                    numGC = len([b for b in k if b in GC_LETTER])
+                    p_badness += conc * (endscore4 * END4 * (PENALTY_OFFSET+1)/(j+1+PENALTY_OFFSET)) * (2**numGC)
+                except KeyError:
+                    pass
+            for j in range(l-4):
+                k = c[j:j+5]
+                try:
+                    endscore5 = endhash5[k]
+                    numGC = len([b for b in k if b in GC_LETTER])
+                    p_badness += conc * (endscore5 * END5 * (PENALTY_OFFSET+1)/(j+1+PENALTY_OFFSET)) * (2**numGC)
+                except KeyError:
+                    pass
+            for j in range(l-5):
+                k = c[j:j+6]
+                try:
+                    endscore6 = endhash6[k]
+                    numGC = len([b for b in k if b in GC_LETTER])
+                    p_badness += conc * (endscore6 * END6 * (PENALTY_OFFSET+1)/(j+1+PENALTY_OFFSET)) * (2**numGC)
+                except KeyError:
+                    pass
+            for j in range(l-6):
+                k = c[j:j+7]
+                try:
+                    midscore7 = middlehash7[k]
+                    numGC = len([b for b in k if b in GC_LETTER])
+                    p_badness += conc * (midscore7 * MIDDLE7 * (PENALTY_OFFSET+1)/(j+1+PENALTY_OFFSET)) * (2**numGC)
+                except KeyError:
+                    pass
+            for j in range(l-7):
+                k = c[j:j+8]
+                try:
+                    midscore8 = middlehash8[k]
+                    numGC = len([b for b in k if b in GC_LETTER])
+                    # p_badness += (midscore8 * MIDDLE8 * (PENALTY_OFFSET+1)/(j+1+PENALTY_OFFSET)) * (2**numGC)
+                    p_badness += conc * (midscore8 * MIDDLE8 * (PENALTY_OFFSET+1)/(j+1+PENALTY_OFFSET)) * (2**numGC)
+                except KeyError:
+                    pass
+            Badness += p_badness
+            one_side_badness.append(p_badness)
+        Badness_component.append(one_side_badness)
+
+    return Badness, Badness_component

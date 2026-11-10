@@ -1,0 +1,30 @@
+# Conda environment for Olivia (design engine, ae9 model, analysis scripts).
+#
+# NUPACK 4.0.2.0 is licensed software and is not installed here. Download it
+# from https://nupack.org (free for academic use) and install it into this
+# environment after creating it:
+#     conda env create -f environment.yml
+#     conda activate olivia
+#     pip install nupack -f /path/to/nupack-4.0.2.0/package
+#     pip install -e .
+name: olivia
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.13
+  - numpy=2.2
+  - pandas=2.3
+  - scipy=1.15
+  - scikit-learn=1.7
+  - matplotlib=3.10
+  - pillow
+  - biopython=1.87
+  - blast           # optional: Olivar's non-specificity check (--db)
+  - mafft=7.526     # optional: aligning raw sequences (--align)
+  - pip
+  - pip:
+      - torch==2.7.1
+      - primer3-py==2.3.0
+      - plotly==6.9.0
+      - tqdm

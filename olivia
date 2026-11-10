@@ -1,0 +1,365 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+
+'''
+Olivia command line interface. Sub-commands follow Olivar's:
+
+    olivia build   -m msa.fasta [--deg] -o out/      build an .olvr design reference
+    olivia tiling  out/<ref>.olvr [--deg] -o out/    design the tiled amplicon scheme
+    olivia save / specificity / sensitivity          as in Olivar
+'''
+
+
+__author__ = 'Dongwei Li, Michael X. Wang'
+__version__ = '1.0.0'
+
+
+import argparse
+import sys
+from olivia import build, tiling, save, specificity, sensitivity
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "validate":
+        print("The 'validate' command has been renamed to 'specificity'. Please use the 'specificity' command instead.")
+        sys.exit(1)
+
+    parser = argparse.ArgumentParser(prog='olivia')
+    parser.add_argument('--version', '-v', action='version', version='%(prog)s v' + __version__)
+    subparsers = parser.add_subparsers(dest='subparser_name', help='sub-commands')
+
+    # build
+    build_parser = subparsers.add_parser('build', help='Build Olivar design reference.')
+    build_parser.add_argument(
+        '--fasta', '-f', type=str, default=None, metavar='fasta-file', 
+        help='Optional, Path to the FASTA reference sequence. The sequence should be high-quality and contain no degenerate bases')
+    build_parser.add_argument(
+        '--var', '-v', type=str, default=None, metavar='<string>', 
+        help='Optional, path to the csv file of SNP coordinates and frequencies. Required columns: "START", "STOP", "FREQ". "FREQ" is considered as 1.0 if empty. Coordinates are 1-based.')
+    build_parser.add_argument(
+        '--msa', '-m', type=str, default=None, metavar='msa-fasta', 
+        help='Optional, Path to the MSA file in FASTA format.')
+    build_parser.add_argument(
+        '--db', '-d', type=str, default=None, metavar='<string>', 
+        help='Optional, path to the BLAST database. Note that this path should end with the name of the BLAST database (e.g., "example_input/Human/GRCh38_primary").')
+    build_parser.add_argument(
+        '--output', '-o', type=str, default='./', metavar='<string>', 
+        help='Output directory (output to current directory by default).')
+    build_parser.add_argument(
+        '--title', '-t', type=str, default=None, metavar='<string>', 
+        help='Name of the Olivar reference file [FASTA record ID].')
+    build_parser.add_argument(
+        '--threads', '-p', type=int, default=1, metavar='<int>', 
+        help='Number of threads [1].')
+    build_parser.add_argument(
+        '--align', '-a', action='store_true', 
+        help='Control whether do alignment or not.'
+    )
+    build_parser.add_argument(
+        '--min-var', type=float, default=0.01, metavar='<float>', 
+        help='Minimum frequency threshold for sequence variations generated from the input MSA.')
+    build_parser.add_argument(
+        '--deg', action='store_true', 
+        help='Control whether use degenerate mode or not. This mode only works with MSA input (--msa).'
+    )
+    build_parser.add_argument(
+        '--cons-thres', type=float, default=0.7, metavar='<float>',
+        help='Accumulation threshold of the degenerate consensus [0.7]. A column stays '
+             'non-degenerate whenever its most frequent base already reaches this, so the '
+             'default ignores any variant below 30%%. Raising it buys coverage and costs '
+             'permutations. Only used with --deg.')
+
+    # tiling
+    tiling_parser = subparsers.add_parser('tiling', help='Design tiled amplicons based on a previously generated Olivar reference.')
+    tiling_parser.add_argument(
+        'ref_path', type=str, metavar='olvr-path', 
+        help='Path to the Olivar reference file (.olvr), or the directory of reference files for multiple targets')
+    tiling_parser.add_argument(
+        '--output', '-o', type=str, default='./', metavar='<string>', 
+        help='Output path (output to current directory by default).')
+    tiling_parser.add_argument(
+        '--title', '-t', type=str, default='olivia-design', metavar='<string>', 
+        help='Name of design [olivia-design].')
+    tiling_parser.add_argument(
+        '--max-amp-len', type=int, default=420, metavar='<int>', 
+        help='Maximum amplicon length [420].')
+    tiling_parser.add_argument(
+        '--min-amp-len', type=int, default=None, metavar='<int>', 
+        help='Minimum amplicon length. 0.9*{max-amp-len} if not provided. Minimum 120.')
+    tiling_parser.add_argument(
+        '--w-egc', type=float, default=1.0, metavar='<float>', 
+        help='Weight for extreme GC content [1.0].')
+    tiling_parser.add_argument(
+        '--w-lc', type=float, default=1.0, metavar='<float>', 
+        help='Weight for low sequence complexity [1.0].')
+    tiling_parser.add_argument(
+        '--w-ns', type=float, default=1.0, metavar='<float>', 
+        help='Weight for non-specificity [1.0].')
+    tiling_parser.add_argument(
+        '--w-var', type=float, default=1.0, metavar='<float>', 
+        help='Weight for variations [1.0].')
+    
+    tiling_parser.add_argument(
+        '--w-sensi', type=float, default=1.0, metavar='<float>', 
+        help='Weight for sensitivity [1.0].')
+    tiling_parser.add_argument(
+        '--w-combi', type=float, default=1.0, metavar='<float>', 
+        help='Weight for combinations [1.0].')
+
+    tiling_parser.add_argument(
+        '--temperature', type=float, default=60.0, metavar='<float>', 
+        help='PCR annealing temperature [60.0].')
+    tiling_parser.add_argument(
+        '--salinity', type=float, default=0.18, metavar='<float>', 
+        help='Concentration of monovalent ions in units of molar [0.18].')
+    tiling_parser.add_argument(
+        '--dg-max', type=float, default=-11.8, metavar='<float>', 
+        help='Maximum free energy change of a primer in kcal/mol [-11.8].')
+    tiling_parser.add_argument(
+        '--min-gc', type=float, default=0.2, metavar='<float>', 
+        help='Minimum GC content of a primer [0.2].')
+    tiling_parser.add_argument(
+        '--max-gc', type=float, default=0.75, metavar='<float>', 
+        help='Maximum GC content of a primer [0.75].')
+    tiling_parser.add_argument(
+        '--min-complexity', type=float, default=0.4, metavar='<float>', 
+        help='Minimum sequence complexity of a primer [0.4].')
+    tiling_parser.add_argument(
+        '--max-len', type=int, default=36, metavar='<int>', 
+        help='Maximum length of a primer [36].')
+    tiling_parser.add_argument(
+        '--check-var', action='store_true', 
+        help="Filter out primer candidates with variations within 5nt of 3' end. \
+        NOT recommended when a lot of variations are provided, \
+        since this would significantly reduce the number of primer candidates. ")
+    tiling_parser.add_argument(
+        '--fp-prefix', type=str, default='', metavar='<DNA>', 
+        help='Prefix of forward primer.')
+    tiling_parser.add_argument(
+        '--rp-prefix', type=str, default='', metavar='<DNA>', 
+        help='Prefix of reverse primer.')
+    tiling_parser.add_argument(
+        '--seed', type=int, default=10, metavar='<int>', 
+        help='Random seed for optimizing primer design regions and primer dimer [10].')
+    tiling_parser.add_argument(
+        '--threads', '-p', type=int, default=1, metavar='<int>', 
+        help='Number of threads [1].')
+    tiling_parser.add_argument(
+        '--iterMul', type=int, default=1, metavar='<int>', 
+        help='Multiplier of iterations during PDR optimization.')
+    tiling_parser.add_argument(
+        '--deg', action='store_true', 
+        help='Control whether use degenerate mode or not.'
+    )
+    tiling_parser.add_argument(
+        '--max-deg', type=int, default=128, metavar='<int>',
+        help='Reject a degenerate primer candidate that expands to more than this many '
+             'concrete sequences [128]. Only used with --deg.')
+    tiling_parser.add_argument(
+        '--deg-sample', '--K', dest='deg_sample', type=int, default=0, metavar='<int>',
+        help='Fold at most this many concrete expansion pairs per degenerate candidate '
+             'pair when scoring primer dimers, estimating the mean deltaG from them '
+             '[0 = fold all, exact]. The paper used 64 for Olivia-deg. Only used with --deg.')
+    tiling_parser.add_argument(
+        '--keep-frac', type=float, default=0.5, metavar='<float>',
+        help='Fraction of primer candidates the encoder keeps per plex and direction '
+             'before NUPACK [0.5]. Use 1.0 to disable the encoder filter.')
+    tiling_parser.add_argument(
+        '--model', type=str, default=None, metavar='<string>',
+        help='Path to the encoder checkpoint [results/encoder/encoder.pt].')
+    tiling_parser.add_argument(
+        '--pair-scorer', type=str, default='nupack', choices=('nupack', 'saddle'),
+        help='Primer dimer scorer used during pool optimization: NUPACK free energies, '
+             "or Olivar's original SADDLE heuristic [nupack].")
+    tiling_parser.add_argument(
+        '--primer-gate', type=str, default='lenient', choices=('lenient', 'varvamp'),
+        help="Hard per-candidate limits: 'lenient' keeps Olivar's GC/complexity/dG "
+             "rules, 'varvamp' adds varVAMP's default Tm, GC, polyX, repeat, 3' clamp and "
+             'self-structure limits [lenient].')
+    tiling_parser.add_argument(
+        '--num-steps', type=int, default=None, metavar='<int>',
+        help='Simulated-annealing cooling steps [derived from pool size].')
+    tiling_parser.add_argument(
+        '--time-per-step', type=int, default=None, metavar='<int>',
+        help='Simulated-annealing trials per step [1000].')
+    tiling_parser.add_argument(
+        '--no-precompute', action='store_true',
+        help='Fill the primer-pair deltaG table lazily during annealing instead of in '
+             'batches up front. Same result, slower.')
+    tiling_parser.add_argument(
+        '--precompute-batch', type=int, default=2000000, metavar='<int>',
+        help='Concrete primer pairs folded per precompute batch; lower it to reduce '
+             'peak memory [2000000].')
+    tiling_parser.add_argument(
+        '--legacy-intraplex', action='store_true',
+        help="Score a plex's own fP-rP dimer as Olivar 1.3.3 did (against the primer "
+             'being replaced). For reproducing designs made before this fix.')
+    tiling_parser.add_argument(
+        '--no-canonical-folding', action='store_true',
+        help='Fold strand pairs in the orientation given rather than a canonical one. '
+             'For reproducing designs made before this change; disables precompute.')
+
+    # save
+    save_parser = subparsers.add_parser('save', help='Load from a previous Olivar design file (.olvd) and save output files.')
+    save_parser.add_argument(
+        'design_path', type=str, metavar='olvd-file', 
+        help='Path to the Olivar design file (.olvd)')
+    save_parser.add_argument(
+        '--output', '-o', type=str, default='./', metavar='<string>', 
+        help='Output path (output to current directory by default).')
+
+    # specificity
+    specificity_parser = subparsers.add_parser('specificity', help='Check the specificity of existing primer pools against a BLAST database of non-spefic sequences.')
+    specificity_parser.add_argument(
+        'primer_pool', type=str, metavar='csv-file', 
+        help='Path to the csv file of a primer pool. Required columns: "amplicon_id" (amplicon name), "fP" (sequence of forward primer), "rP" (sequence of reverse primer).')
+    specificity_parser.add_argument(
+        '--pool', type=int, default=1, metavar='<int>', 
+        help='Primer pool number [1].')
+    specificity_parser.add_argument(
+        '--db', '-d', type=str, default=None, metavar='<string>', 
+        help='Optional, path to the BLAST database. Note that this path should end with the name of the BLAST database (e.g., "example_input/Human/GRCh38_primary").')
+    specificity_parser.add_argument(
+        '--output', '-o', type=str, default='./', metavar='<string>', 
+        help='Output path (output to current directory by default).')
+    specificity_parser.add_argument(
+        '--title', '-t', type=str, default='olivar-specificity', metavar='<string>', 
+        help='Name of validation [olivar-specificity].')
+    specificity_parser.add_argument(
+        '--max-amp-len', type=int, default=1500, metavar='<int>', 
+        help='Maximum length of predicted non-specific amplicon [1500]. Ignored is no BLAST database is provided.')
+    specificity_parser.add_argument(
+        '--temperature', type=float, default=60.0, metavar='<float>', 
+        help='PCR annealing temperature [60.0].')
+    specificity_parser.add_argument(
+        '--threads', '-p', type=int, default=1, metavar='<int>', 
+        help='Number of threads [1].')
+
+    # sensitivity
+    sensitivity_help = 'Check the sensitivity of existing primer pools against an MSA of target sequences, and visualize the MSA and primer alignments.'
+    sensitivity_parser = subparsers.add_parser(
+        'sensitivity', help=sensitivity_help, description=sensitivity_help, formatter_class=argparse.RawTextHelpFormatter
+    )
+    sensitivity_parser.add_argument(
+        'primer_pool', type=str, metavar='csv-file', 
+        help='Path to the csv file of a primer pool. Required columns: "amplicon_id" (amplicon name), "fP" (sequence of forward primer), "rP" (sequence of reverse primer).')
+    sensitivity_parser.add_argument(
+        '--msa', '-m', type=str, default=None, metavar='msa-fasta', 
+        help='Path to the MSA file in FASTA format.')
+    sensitivity_parser.add_argument(
+        '--pool', type=int, default=1, metavar='<int>', 
+        help='Primer pool number [1].')
+    sensitivity_parser.add_argument(
+        '--temperature', type=float, default=60.0, metavar='<float>', 
+        help='Annealing temperature in Degree Celsius [60.0].')
+    sensitivity_parser.add_argument(
+        '--sodium', '-s', type=float, default=0.18, metavar='<float>', 
+        help='The sum of the concentrations of monovalent ions (Na+, K+, NH4+), in molar [0.18].')
+    sensitivity_parser.add_argument(
+        '--output', '-o', type=str, default='./', metavar='<string>', 
+        help='Output path (output to current directory by default).')
+    sensitivity_parser.add_argument(
+        '--title', '-t', type=str, default='olivar-sensitivity', metavar='<string>', 
+        help='Name of validation [olivar-sensitivity].')
+    sensitivity_parser.add_argument(
+        '--threads', '-p', type=int, default=1, metavar='<int>', 
+        help='Number of threads [1].')
+    sensitivity_parser.add_argument(
+        '--align', '-a', action='store_true', 
+        help='Control whether do alignment or not.'
+    )
+
+    args = parser.parse_args()
+
+    if args.subparser_name == 'build':
+        build(
+            fasta_path=args.fasta, 
+            var_path=args.var, 
+            msa_path=args.msa,
+            BLAST_db=args.db, 
+            out_path=args.output, 
+            title=args.title, 
+            threads=args.threads,
+            align=args.align,
+            min_var=args.min_var,
+            deg=args.deg,
+            cons_thres=args.cons_thres
+        )
+
+    elif args.subparser_name == 'tiling':
+        tiling(
+            ref_path=args.ref_path, 
+            out_path=args.output, 
+            title=args.title, 
+            max_amp_len=args.max_amp_len, 
+            min_amp_len=args.min_amp_len, 
+            w_egc=args.w_egc, 
+            w_lc=args.w_lc, 
+            w_ns=args.w_ns, 
+            w_var=args.w_var, 
+
+            w_sensi=args.w_sensi,
+            w_combi=args.w_combi,
+
+            temperature=args.temperature, 
+            salinity=args.salinity, 
+            dG_max=args.dg_max, 
+            min_GC=args.min_gc, 
+            max_GC=args.max_gc, 
+            min_complexity=args.min_complexity, 
+            max_len=args.max_len, 
+            check_var=args.check_var, 
+            fP_prefix=args.fp_prefix, 
+            rP_prefix=args.rp_prefix, 
+            seed=args.seed, 
+            threads=args.threads,
+            iterMul=args.iterMul,
+            deg=args.deg,
+            encoder_keep_frac=args.keep_frac,
+            encoder_model=args.model,
+            pair_scorer=args.pair_scorer,
+            primer_gate=args.primer_gate,
+            max_deg=args.max_deg,
+            num_steps=args.num_steps,
+            time_per_step=args.time_per_step,
+            canonical_folding=not args.no_canonical_folding,
+            fix_intraplex=not args.legacy_intraplex,
+            deg_sample=args.deg_sample,
+            precompute_pairs=not args.no_precompute,
+            precompute_batch=args.precompute_batch
+        )
+
+    elif args.subparser_name == 'save':
+        save(
+            design_out=args.design_path, 
+            out_path=args.output
+        )
+
+    elif args.subparser_name == 'specificity':
+        specificity(
+            primer_pool=args.primer_pool, 
+            pool=args.pool, 
+            BLAST_db=args.db, 
+            out_path=args.output, 
+            title=args.title, 
+            max_amp_len=args.max_amp_len, 
+            temperature=args.temperature, 
+            threads=args.threads
+        )
+
+    elif args.subparser_name == 'sensitivity':
+        sensitivity(
+            primer_pool=args.primer_pool,
+            msa_path=args.msa,
+            pool=args.pool,   
+            temperature=args.temperature, 
+            sodium=args.sodium, 
+            out_path=args.output, 
+            title=args.title, 
+            threads=args.threads,
+            align=args.align
+        )
+
+    else:
+        print('A sub-command needs to be specified (build, tiling, save, specificity, sensitivity).')
+        print("Use '--help' to print detailed descriptions of command line arguments")
