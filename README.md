@@ -2,6 +2,10 @@
 
 **Learned sequence representations for automated primer design in multiplex tiled amplicon sequencing.**
 
+<p align="center">
+  <img src="OLIVIA_overview.png" alt="" width="600">
+</p>
+
 Olivia designs tiled amplicon primer schemes from a multiple sequence alignment
 (MSA). It extends [Olivar](https://github.com/treangenlab/Olivar) with:
 
@@ -18,8 +22,6 @@ Olivia designs tiled amplicon primer schemes from a multiple sequence alignment
 > Li D., Wang M.X., Stadler L.B., Treangen T.J. *Olivia: Learned Sequence
 > Representations Enable Automated Primer Design for Multiplex Tiled Amplicon
 > Sequencing.*
-
-<img src="OLIVIA_overview.png" alt="" width="50%">
 
 ## Installation
 
@@ -46,8 +48,8 @@ conda activate olivia
 
 NUPACK cannot be redistributed by us, so it is installed from your own download:
 
-1. Register and download **NUPACK 4.0.2.0** from the download page at <https://nupack.org>.
-2. Unzip it and install the wheel matching your Python (pip picks it):
+1. Register and download **NUPACK 4.0.2.0** from <https://nupack.org>.
+2. Unzip it and install the wheel:
 
    ```bash
    unzip nupack-4.0.2.0.zip
@@ -157,6 +159,7 @@ src/olivia_encoder/         the encoder model
     train.py                  training
     prepare_primers.py, build_dataset.py, nupack_dump_sequences.py, nupack_targets.py
                               dataset preparation
+data/                       training data (The literature-extracted primers)
 results/encoder/            trained checkpoint (encoder.pt) and the paper's model results
 analysis/                   model figures (classification, embedding, synergy, risk)
 benchmark/                  12-virus benchmark against Olivar, PrimalScheme3, varVAMP
@@ -164,26 +167,15 @@ example/                    example inputs
 ```
 
 ## The encoder
-<img src="results/encoder/Olivia_multiHead_encoder.png" alt="" width="75%">
+<p align="center">
+  <img src="results/encoder/Olivia_multiHead_encoder.png" alt="" width="100%">
+</p>
 
 ### Retraining
 
 The training corpus (about 1.7 million primer records, 980,039 unique
-sequences) and the five primer3-labelled evaluation corpora are too large for
-this repository. They are distributed separately: **[DATA LINK]**. Unpack them under
-`data/`. The pipeline is:
-
-```bash
-D=data/embedded/true_data_all_t37
-python -m olivia_encoder.prepare_primers --input primers.csv --output data/primers_calculated.csv
-python -m olivia_encoder.build_dataset   --input data/primers_calculated.csv --output-dir $D
-python -m olivia_encoder.nupack_dump_sequences --embedded-dir $D
-python -m olivia_encoder.nupack_targets        --embedded-dir $D
-python -m olivia_encoder.train                 --embedded-dir $D
-```
-
-An evaluation corpus is embedded against the training set's schema with
-`build_dataset --reference-dir data/embedded/true_data_all_t37`.
+sequences) is under `data/`. Embedding is needed for using the dataset for retraining:
+`xxx`.
 
 ## Reproducing the paper
 
