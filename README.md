@@ -17,15 +17,14 @@ Olivia designs tiled amplicon primer schemes from a multiple sequence alignment
 
 > Li D., Wang M.X., Stadler L.B., Treangen T.J. *Olivia: Learned Sequence
 > Representations Enable Automated Primer Design for Multiplex Tiled Amplicon
-> Sequencing.* (manuscript submitted)
+> Sequencing.*
 
----
+<img src="OLIVIA_overview.png" alt="" width="50%">
 
 ## Installation
 
 **Requirements:** Linux (x86-64; tested), [conda](https://docs.conda.io/en/latest/miniconda.html)
-or mamba, and several GB of disk for the environment (mostly PyTorch). A GPU is
-optional; on CPU the encoder scores about 60 primers per second.
+or mamba. A GPU is optional; on CPU the encoder scores about 60 primers per second.
 
 ### 1. Download Olivia
 
@@ -33,8 +32,6 @@ optional; on CPU the encoder scores about 60 primers per second.
 git clone https://github.com/treangenlab/Olivia.git
 cd Olivia
 ```
-
-Or download the ZIP from the GitHub page (**Code → Download ZIP**) and unzip it.
 The repository includes the trained encoder (`results/encoder/encoder.pt`,
 2.4 MB), so nothing else needs to be downloaded to design primers.
 
@@ -47,8 +44,7 @@ conda activate olivia
 
 ### 3. Install NUPACK 4
 
-NUPACK is free for academic use but cannot be redistributed, so it is installed
-from your own download:
+NUPACK cannot be redistributed by us, so it is installed from your own download:
 
 1. Register and download **NUPACK 4.0.2.0** from the download page at <https://nupack.org>.
 2. Unzip it and install the wheel matching your Python (pip picks it):
@@ -68,9 +64,7 @@ pip install -e .
 ```
 
 Use editable mode (`-e`): Olivia loads the encoder checkpoint from
-`results/encoder/` inside this directory, so keep the repository where it is.
-To use a checkpoint elsewhere, set `OLIVIA_MODEL=/path/to/encoder.pt` or pass
-`olivia tiling --model`.
+`results/encoder/` inside this directory.
 
 ### 5. Check the installation
 
@@ -80,10 +74,7 @@ python -c "import olivia, encoder_filter; print(encoder_filter.EncoderScorer().s
 ```
 
 Then run the [Quick start](#quick-start) example (about 2 minutes on 16 threads).
-
-To update later, run `git pull` in the `Olivia` directory; the editable install
-picks up the changes. The benchmark tools (Olivar, PrimalScheme3, varVAMP) have
-their own environments, described in [benchmark/README.md](benchmark/README.md).
+The benchmark tools (Olivar, PrimalScheme3, varVAMP) have their own environments, described in [benchmark/README.md](benchmark/README.md).
 
 ## Quick start
 
@@ -101,7 +92,7 @@ olivia build -m example/hepatitis_e_aln.fasta --deg -o example/out/ref_deg -p 16
 olivia tiling example/out/ref_deg/hepatitis_e_aln.olvr --deg --K 64 -o example/out/deg -p 16
 ```
 
-`tiling` writes the following, with names prefixed by `--title` (`olivia-design`):
+`tiling` writes the following:
 
 | File | Content |
 |---|---|
@@ -124,8 +115,7 @@ A single-target design takes about 2 minutes (non-degenerate) to 4 minutes
 | `tiling --keep-frac` | 0.5 | fraction of candidates kept per plex by the encoder; `1.0` disables it |
 | `tiling --max-deg` | 128 | reject candidates expanding to more concrete sequences |
 | `tiling --K` / `--deg-sample` | 0 | fold at most K expansion pairs per degenerate candidate pair (0 = all, exact); 64 is the paper setting |
-| `tiling --pair-scorer` | nupack | `saddle` restores Olivar's dimer heuristic |
-| `tiling -p` | 1 | worker processes; memory is about 1.8 GB + 0.48 GB per worker |
+| `tiling -p` | 1 | worker processes |
 
 Run `olivia build --help` and `olivia tiling --help` for all options. The
 `specificity` and `sensitivity` sub-commands are unchanged from Olivar.
@@ -154,15 +144,15 @@ scores = scorer.score(["ACTACTGCCATTGAGCAGGC", "GGGGGGCCCCCCGGGGGGCCCC"])
 
 ```
 olivia                      command-line interface
-src/olivia/                 design engine (Olivar 1.3.3 fork)
+src/olivia/                 design engine
     encoder_filter.py         encoder scoring and candidate filtering
     nupack_helper.py          NUPACK free-energy evaluation
     pair_table.py             cached primer-pair deltaG table for pool optimization
     main.py, tiling_helper.py build / tiling workflow
 src/olivia_encoder/         the encoder model
     encoder.py                network and the free-energy / pair-map heads
-    density.py                property density head (C_marg, C_inter)
-    properties.py             the eight primer properties and their binning
+    density.py                property distribution head (C_marg, C_inter)
+    properties.py             the primer properties
     sequence.py, data.py, targets.py, synergy.py
     train.py                  training
     prepare_primers.py, build_dataset.py, nupack_dump_sequences.py, nupack_targets.py
@@ -174,21 +164,7 @@ example/                    example inputs
 ```
 
 ## The encoder
-
-A primer (up to 40 nt, IUPAC codes spread uniformly over their bases) passes
-through a shared dilated convolutional encoder with a pairwise base-pairing
-stem. Three heads score it (the code calls them Head A, P and C):
-
-| Head | Score | What it detects | Code |
-|---|---|---|---|
-| free-energy head M_ΔG | `S_A` (`A`) | stable hairpin or homodimer, from predicted NUPACK free energies | `encoder.head_a_score_dg` |
-| base-pairing map head M_Π | `S_P` (`P`) | maximum predicted intra-primer pairing probability | `encoder.head_p_score` |
-| property density head M_C | `C_marg`, `C_inter` | a rare property value, or a combination that is rare given the other properties | `density.head_c_scores` |
-
-In the design pipeline the four scores are mapped through an empirical CDF over
-the candidate pool, and their maximum ranks the candidates. The
-checkpoint also stores each head's 95th-percentile threshold over published
-primers, which the benchmark's abnormality rate uses.
+<img src="results/encoder/Olivia_multiHead_encoder.png" alt="" width="75%">
 
 ### Retraining
 
@@ -208,10 +184,6 @@ python -m olivia_encoder.train                 --embedded-dir $D
 
 An evaluation corpus is embedded against the training set's schema with
 `build_dataset --reference-dir data/embedded/true_data_all_t37`.
-
-`train` defaults to the paper's settings: 3-fold CV, 5 epochs with M_C off,
-then M_C trained on the free-energy head's predictions. It writes to
-`results/encoder_retrained/` and leaves the shipped checkpoint in place.
 
 ## Reproducing the paper
 
@@ -236,8 +208,7 @@ primer scheme evaluated in the paper is in
 
 ## License
 
-GPL-3.0, inherited from Olivar (see `LICENSE`). NUPACK is subject to its own
-license and must be obtained separately.
+GPL-3.0(see `LICENSE`). NUPACK is subject to its own license and must be obtained separately.
 
 ## Contact
 
