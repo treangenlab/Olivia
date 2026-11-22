@@ -1,6 +1,7 @@
 # Olivia
-
-**Learned sequence representations for automated primer design in multiplex tiled amplicon sequencing.**
+> Li D., Wang M.X., Stadler L.B., Treangen T.J. *Olivia: Learned Sequence
+> Representations Enable Automated Primer Design for Multiplex Tiled Amplicon
+> Sequencing.*
 
 <p align="center">
   <img src="OLIVIA_overview.png" alt="" width="600">
@@ -18,10 +19,6 @@ Olivia designs tiled amplicon primer schemes from a multiple sequence alignment
 - **Degenerate primers.** In degenerate mode the design reference is an IUPAC
   consensus of the MSA, so primers can cover sequence variation with ambiguous
   bases.
-
-> Li D., Wang M.X., Stadler L.B., Treangen T.J. *Olivia: Learned Sequence
-> Representations Enable Automated Primer Design for Multiplex Tiled Amplicon
-> Sequencing.*
 
 ## Installation
 
@@ -174,8 +171,7 @@ example/                    example inputs
 ### Retraining
 
 The training corpus (about 1.7 million primer records, 980,039 unique
-sequences) is under `data/`. Embedding is needed for using the dataset for retraining:
-`xxx`.
+sequences) is at <https://huggingface.co/datasets/dongwei2001/Olivia-training-data>. 
 
 ## Reproducing the paper
 
