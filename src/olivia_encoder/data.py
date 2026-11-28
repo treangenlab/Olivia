@@ -21,16 +21,14 @@ SEED = 42
 
 
 class SplitBundle:
-    """One split: one-hot sequences, tabular features, labels and the source frame."""
+    """One split: one-hot sequences and the source frame."""
 
     def __init__(self, path: Path):
         try:
             data = torch.load(path, map_location="cpu", weights_only=False)
         except TypeError:
             data = torch.load(path, map_location="cpu")
-        self.tabular = data["tabular"].float()
         self.sequence = data.get("primer_sequence", data.get("sequence")).float()
-        self.labels = data["labels"].long()
         self.frame = data["frame"]
 
 

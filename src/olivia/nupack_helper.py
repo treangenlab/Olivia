@@ -288,7 +288,7 @@ def _get_proc_pool(n_cpu):
             workers = max(1, min(int(n_cpu), os.cpu_count() or 1))
             try:
                 # No forkserver preload: importing NUPACK into the forkserver deadlocks
-                # its workers.
+                # its workers (the preload is cleared in olivia/__init__.py).
                 _proc_pool = ProcessPoolExecutor(
                     max_workers=workers,
                     mp_context=multiprocessing.get_context('forkserver'),

@@ -242,8 +242,6 @@ def add_calculated_info_batch(df: pd.DataFrame, primer_column: str) -> pd.DataFr
             value if math.isnan(value) else round(value, 2) for value in values
         ]
 
-    df["source_count"] = ""   # placeholder column expected by build_dataset
-
     return df
 
 

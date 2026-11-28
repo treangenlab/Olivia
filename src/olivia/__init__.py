@@ -20,7 +20,9 @@ __version__ = '1.0.0'
 
 import os
 import sys
+import multiprocessing
 CURRENT_DIR = os.path.dirname(__file__)
 sys.path.append(CURRENT_DIR)
+multiprocessing.set_forkserver_preload([])
 
 from main import build, tiling, save, specificity, sensitivity

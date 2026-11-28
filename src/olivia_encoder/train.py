@@ -823,7 +823,7 @@ def main() -> None:
         for split in bundles:
             b = bundles[split]
             n = min(args.max_train_samples, len(b.frame))
-            b.sequence, b.tabular, b.labels = b.sequence[:n], b.tabular[:n], b.labels[:n]
+            b.sequence = b.sequence[:n]
             b.frame = b.frame.iloc[:n]
         print(f"[smoke run] truncated every split to <= {args.max_train_samples} samples")
 
